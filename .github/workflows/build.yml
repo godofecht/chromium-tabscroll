@@ -1,0 +1,138 @@
+name: build-chromium-tabscroll
+
+# Builds Chromium with horizontal tab scrolling restored, on free GitHub-hosted
+# runners. A cold Chromium build does not fit one 6h job; this warms an sccache
+# so successive runs make progress and eventually produce a Chrome artifact.
+#
+# Cache backends (pick with the CACHE_BACKEND secret/var):
+#   gha  -> GitHub Actions cache. Free, but 10 GB/repo is far smaller than a full
+#           Chromium object cache, so runs make partial progress (good for
+#           patch-compiles, not a full artifact).
+#   s3   -> S3-compatible store (AWS S3, Cloudflare R2, Backblaze B2). Set
+#           SCCACHE_BUCKET / SCCACHE_ENDPOINT / AWS_* secrets. This is the path
+#           to a full artifact for a few dollars of storage.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "ninja target"
+        default: "chrome"
+      max_build_minutes:
+        description: "stop the build after N minutes to save the sccache"
+        default: "300"
+  push:
+    paths: [ "patches/**", "config/**", "scripts/**", ".github/workflows/**" ]
+
+permissions:
+  contents: read
+
+jobs:
+  # Fast, free signal: does the integrator still bind to upstream HEAD? Runs in
+  # ~1 min with no checkout, so anchor drift is caught before the long build.
+  integrate-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check anchors against chromium HEAD
+        run: bash scripts/integrate-check.sh main
+
+  build:
+    needs: integrate-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 350          # under the 360-minute hard limit
+    env:
+      DEPOT_TOOLS: ${{ github.workspace }}/depot_tools
+      SCCACHE_VERSION: v0.8.2
+      CACHE_BACKEND: ${{ vars.CACHE_BACKEND || 'gha' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reclaim disk
+        run: sudo bash scripts/reclaim-disk.sh
+
+      - name: Install sccache
+        run: |
+          curl -sSfL "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            | sudo tar -xz --strip-components=1 -C /usr/local/bin
+          sccache --version
+
+      - name: Configure sccache backend (GHA)
+        if: env.CACHE_BACKEND == 'gha'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('SCCACHE_GHA_ENABLED', 'true');
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Configure sccache backend (S3-compatible)
+        if: env.CACHE_BACKEND == 's3'
+        run: |
+          echo "SCCACHE_BUCKET=${{ secrets.SCCACHE_BUCKET }}"     >> "$GITHUB_ENV"
+          echo "SCCACHE_ENDPOINT=${{ secrets.SCCACHE_ENDPOINT }}" >> "$GITHUB_ENV"
+          echo "SCCACHE_S3_USE_SSL=true"                          >> "$GITHUB_ENV"
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}"         >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> "$GITHUB_ENV"
+
+      - name: Fetch depot_tools
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_TOOLS"
+          echo "$DEPOT_TOOLS" >> "$GITHUB_PATH"
+
+      - name: Fetch Chromium (no history)
+        run: |
+          mkdir chromium && cd chromium
+          fetch --no-history --nohooks chromium
+          cd src
+          echo "src=$PWD" >> "$GITHUB_ENV"
+
+      - name: Install build deps
+        working-directory: ${{ env.src }}
+        run: sudo ./build/install-build-deps.sh --no-prompt
+
+      - name: Sync hooks
+        working-directory: ${{ env.src }}
+        run: gclient runhooks
+
+      - name: Apply tab-scrolling patches
+        working-directory: ${{ env.src }}
+        run: CHROMIUM_SRC="$PWD" bash "$GITHUB_WORKSPACE/scripts/apply-patches.sh"
+
+      - name: Configure build
+        working-directory: ${{ env.src }}
+        run: |
+          mkdir -p out/Default
+          cp "$GITHUB_WORKSPACE/config/args.gn" out/Default/args.gn
+          gn gen out/Default
+
+      - name: Build (time-boxed, checkpoints sccache)
+        working-directory: ${{ env.src }}
+        run: |
+          sccache --start-server || true
+          MINS="${{ github.event.inputs.max_build_minutes || 300 }}"
+          set +e
+          timeout "${MINS}m" autoninja -C out/Default "${{ github.event.inputs.target || 'chrome' }}"
+          status=$?
+          set -e
+          sccache --show-stats
+          if [ $status -eq 124 ]; then
+            echo "::notice::Build hit the time box. sccache is warmed; re-run to continue."
+          fi
+          echo "build_status=$status" >> "$GITHUB_ENV"
+
+      - name: Upload Chrome artifact (if the build finished)
+        if: env.build_status == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-tabscroll-linux
+          path: |
+            ${{ env.src }}/out/Default/chrome
+            ${{ env.src }}/out/Default/*.so
+            ${{ env.src }}/out/Default/*.pak
+            ${{ env.src }}/out/Default/icudtl.dat
+          if-no-files-found: warn
+          retention-days: 7

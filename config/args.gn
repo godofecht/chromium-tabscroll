@@ -1,0 +1,13 @@
+# Reduced-cost release build of Chromium with tab scrolling restored.
+# Tuned to fit free CI: component build links faster, no symbols, no NaCl.
+is_debug = false
+is_component_build = true
+symbol_level = 0
+blink_symbol_level = 0
+v8_symbol_level = 0
+dcheck_always_on = false
+enable_nacl = false
+use_remoteexec = false
+# sccache is wired via cc_wrapper below (set by the workflow to the sccache path).
+cc_wrapper = "sccache"
+# Keep the tab-scrolling feature compiled in and on.

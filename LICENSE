@@ -1,0 +1,9 @@
+BSD 3-Clause License
+
+Files under src/ carry the Chromium copyright header and are governed by the
+Chromium BSD-style license, because they are written to be compiled as part of
+Chromium. See https://source.chromium.org/chromium/chromium/src/+/main:LICENSE
+for the full text.
+
+The tooling in this repo (scripts/, integration/, .github/) is provided under the
+same BSD 3-Clause terms.
