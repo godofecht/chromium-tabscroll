@@ -41,20 +41,25 @@ reference/      the original removal diff, for reference only
 PLAN.md         the re-implementation design
 ```
 
-## Building on free CI
+## Building on free CI (fully free, no setup)
 
-Nothing about compiling Chromium is light: a cold build is ~20-40 CPU-hours. Free
-GitHub-hosted runners are 4 vCPU / 16 GB RAM / 14 GB disk. Two constraints and how
-the pipeline handles them:
+No paid runners, no paid storage, no access token. A cold Chromium build is
+~20-40 CPU-hours and won't finish in one free 6-hour job, so the pipeline splits
+it across runs:
 
-- **Disk.** 14 GB can't hold the checkout. `scripts/reclaim-disk.sh` frees ~30 GB
-  by removing preinstalled SDKs.
-- **Time.** A cold build won't finish in the 6-hour job limit. The pipeline warms
-  an `sccache` so each run is mostly cache hits and resumes where the last stopped.
-  GitHub's 10 GB cache is smaller than Chromium's object volume, so a truly free run
-  makes partial progress; a full downloadable Chrome artifact realistically needs a
-  few dollars of S3/R2 object storage (wire it via the `s3` cache backend). See
-  `.github/workflows/build.yml`.
+- **Disk.** The build runs on `/mnt` (the ~65 GB ephemeral disk), and
+  `scripts/reclaim-disk.sh` frees another ~30 GB on root.
+- **Compile cache.** A lean, symbol-free component build keeps the `sccache`
+  under the free 10 GB Actions-cache cap, so it persists between runs without
+  eviction. Each run replays cache hits fast and pushes the compile frontier
+  forward, so progress is monotonic and the build converges over a few runs.
+- **Continuation.** A schedule (`cron`, every 6h) wakes the build and it resumes
+  where the last run stopped. Press "Run workflow" to advance sooner. When the
+  binary is done it's uploaded as the `chrome-tabscroll-linux` artifact and a
+  marker short-circuits further runs.
+
+The whole thing runs on free GitHub-hosted minutes for public repos. See
+`.github/workflows/build.yml`.
 
 ## Local build
 
