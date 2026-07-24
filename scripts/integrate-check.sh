@@ -44,6 +44,7 @@ assert "chrome/browser/ui/BUILD.gn"         "horizontal_tab_scroll_container.cc"
 assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"  "scroll_container_"
 assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "HorizontalTabScrollContainer>"
 assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "SetAvailableWidthCallback"
+assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "children.emplace_back(scroll_container_.get())"
 
 # Idempotency: a second run must not error or double-apply.
 CHROMIUM_SRC="$WORK" python3 "$HERE/integration/integrate.py" >/dev/null

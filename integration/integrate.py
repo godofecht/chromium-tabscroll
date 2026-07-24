@@ -107,8 +107,31 @@ def main():
          '#include "chrome/browser/ui/views/tabs/horizontal_tab_scroll_container.h"\n',
          mode="before")
 
-    # 5. Region view impl construction wiring is a multi-line replacement handled
-    #    by replace_construction() below.
+    # 5. Z-order: when scrolling, the direct child is the scroll container, not
+    #    the (now nested) tab strip. List the real direct child so painting and
+    #    z-order stay correct. Safe when scroll_container_ is null (flag off):
+    #    the else branch keeps the original behavior.
+    edit(RV_CC,
+         "  if (tab_strip_) {\n"
+         "    children.emplace_back(tab_strip_.get());\n"
+         "  }",
+         "  if (scroll_container_) {\n"
+         "    children.emplace_back(scroll_container_.get());\n"
+         "  } else if (tab_strip_) {\n"
+         "    children.emplace_back(tab_strip_.get());\n"
+         "  }",
+         mode="replace", required=True)
+
+    # 6. Caption hit-test: exclude the scroll container from the "treat as
+    #    caption" fallback loop, the same way tab_strip_ is excluded, so an empty
+    #    scrolled region stays window-draggable. No-op when scroll_container_ is
+    #    null (child != nullptr is always true).
+    edit(RV_CC,
+         "    if (child != tab_strip_ && child != reserved_grab_handle_space_ &&",
+         "    if (child != tab_strip_ && child != scroll_container_ &&\n"
+         "        child != reserved_grab_handle_space_ &&",
+         mode="replace", required=False)
+
     print(">> base edits done")
 
 
