@@ -1,5 +1,6 @@
-# Reduced-cost release build of Chromium with tab scrolling restored.
-# Tuned to fit free CI: component build links faster, no symbols, no NaCl.
+# Lean release build of Chromium with tab scrolling, tuned for free CI:
+# component build links faster, no debug symbols keeps the sccache small enough
+# to fit the free 10 GB Actions cache, and warnings don't fail a fork build.
 is_debug = false
 is_component_build = true
 symbol_level = 0
@@ -8,6 +9,7 @@ v8_symbol_level = 0
 dcheck_always_on = false
 enable_nacl = false
 use_remoteexec = false
-# sccache is wired via cc_wrapper below (set by the workflow to the sccache path).
+# Don't let a stray warning in fork code abort a multi-run build.
+treat_warnings_as_errors = false
+# sccache turns repeated compiles into cache hits so runs resume cheaply.
 cc_wrapper = "sccache"
-# Keep the tab-scrolling feature compiled in and on.
