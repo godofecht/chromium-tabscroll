@@ -1,0 +1,5 @@
+# Baseline launch profile for this Chromium overlay.
+--enable-features=HorizontalTabScrolling
+--no-first-run
+--disable-search-engine-choice-screen
+--disable-features=ChromeWhatsNewUI

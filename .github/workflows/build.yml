@@ -30,7 +30,7 @@ permissions:
   actions: write               # to read/write the Actions cache
 
 env:
-  CACHE_VER: v1                 # bump to discard all persisted caches
+  CACHE_VER: v2                 # bump to discard all persisted caches
 
 jobs:
   # Fast, free signal (~1 min, no checkout): do the integrator's anchors still
@@ -44,8 +44,25 @@ jobs:
       - uses: actions/checkout@v4
       - run: bash scripts/integrate-check.sh main
 
+  runtime-flags-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/validate-runtime-flags.sh
+      - run: bash scripts/print-flags.sh base performance privacy no-ai >/tmp/chromium-flags.txt
+
+  docs-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: test -f docs/adblock-manifest.md
+      - run: test -f docs/ai-opt-out.md
+      - run: test -f docs/performance-defaults.md
+
   build:
-    needs: integrate-check
+    needs: [integrate-check, runtime-flags-check, docs-check]
     runs-on: ubuntu-latest
     # One build at a time. A new run queues behind an in-progress one instead of
     # competing for the runner or clobbering the warming cache.
@@ -149,6 +166,9 @@ jobs:
           echo "build_status=$status" >> "$GITHUB_ENV"
           if [ $status -eq 124 ]; then
             echo "::notice::Time box hit. Cache saved; the schedule will continue."
+          elif [ $status -ne 0 ]; then
+            echo "::error::Chromium build failed with exit status $status."
+            exit $status
           fi
 
       # Always persist the warmed cache, even when the build timed out, so the

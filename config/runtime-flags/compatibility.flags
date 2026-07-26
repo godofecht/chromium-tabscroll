@@ -1,0 +1,3 @@
+# Compatibility-first profile for testing sites against the fork with fewer hardening changes.
+--enable-features=HorizontalTabScrolling
+--disable-features=ChromeWhatsNewUI

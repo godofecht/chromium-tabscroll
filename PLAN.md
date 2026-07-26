@@ -72,21 +72,39 @@ A `views::ScrollView` subclass that:
    (the scroll container when scrolling, else the strip).
 4. New-tab-button placement anchors on the outer flex child's right edge.
 5. `chrome/browser/ui/BUILD.gn` gains the two new source entries.
+6. `IsPositionInWindowCaption` hit-tests the scroll viewport before delegating to
+   the nested tab strip.
+7. `TabStrip::SetSelection` scrolls the active tab into view so keyboard
+   shortcuts, session restore, and programmatic selection do not leave it hidden.
 
 ## Known follow-ups (the CI compile loop will surface these)
 
 - **New-tab-button / caption / z-order coupling.** `Layout(PassKey)`,
-  `IsPositionInWindowCaption`, and `GetChildrenInZOrder` reference `tab_strip_`
-  directly. Item 4 handles the NTB right-edge; the caption hit-test and z-order
-  may need the same outer-view treatment once the build runs.
+  `IsPositionInWindowCaption`, and `GetChildrenInZOrder` are now handled by
+  anchored edits and asserted by `integrate-check`; the CI compile loop is still
+  the final signal for signature or include drift.
 - **Drag auto-scroll.** Hook `DraggingTabsSession::MoveAttached` to scroll the
   viewport when a dragged tab nears an edge; drag-area geometry comes from
   `TabStrip::TabDragContextImpl::GetTabDragAreaWidth()`, which already special-
   cases scrolling. Not in the first pass.
-- **Scroll active tab into view** on selection change, via
-  `views::View::ScrollRectToVisible` from the container.
-- **chrome://flags entry.** Controlled by `--enable-features` for now; add an
-  `about_flags.cc` entry for a user-facing toggle.
+- **Scroll active tab into view.** Implemented in `TabStrip::SetSelection` via
+  `View::ScrollRectToVisible` on the newly active tab.
+- **chrome://flags entry.** Implemented by the integrator as
+  `chrome://flags/#horizontal-tab-scrolling`; `integrate-check` verifies the
+  anchors against upstream HEAD.
+
+## 2026 browser pain-point overlay roadmap
+
+Phase 1: runtime profiles and docs for performance, privacy, AI/model-download
+opt-out, and adblock/extension-manifest compatibility.
+
+Phase 2: CI validation for runtime flag syntax, docs presence, and upstream
+feature-name drift.
+
+Phase 3: optional `chrome://flags` integration for fork builds where Chromium has
+a supported feature path.
+
+Phase 4: managed-policy templates for extension/adblock deployments.
 
 ## Why this survives rebases
 

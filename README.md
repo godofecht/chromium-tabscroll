@@ -1,7 +1,13 @@
 # chromium-tabscroll
 
-Horizontal tab scrolling for Chromium, rewritten from scratch against the current
-tabstrip and built on free CI.
+Chromium overlay tooling for browser pain points that got worse in 2026:
+horizontal tab scrolling, saner runtime defaults, privacy/hardening launch
+profiles, AI/model-download opt-out guidance, adblock/extension-manifest notes,
+and CI checks that catch upstream drift.
+
+It does not vendor a full Chromium checkout. The repo stays small: self-authored
+overlay files, anchored integrator edits, runtime profiles, policy samples, docs,
+and a free-CI build pipeline.
 
 ## Background
 
@@ -34,11 +40,35 @@ The old removal diff is kept in `reference/` for study only.
 ```
 src/            new source files (self-authored, dropped into the tree as an overlay)
 integration/    thin patches wiring the new files into BUILD.gn + the region view + flags
-config/args.gn  reduced-cost release build args
+config/         reduced-cost build args, runtime profiles, policy samples
 scripts/        apply-patches.sh, reclaim-disk.sh
+docs/           adblock, AI opt-out, and performance-default notes
 .github/        the free-CI build pipeline
 reference/      the original removal diff, for reference only
 PLAN.md         the re-implementation design
+```
+
+## Runtime profiles
+
+Use the profiles against any Chromium-like binary while the full fork build is
+warming in CI:
+
+```bash
+./scripts/print-flags.sh base performance privacy no-ai
+CHROME=/path/to/chrome ./scripts/launch-chromium.sh
+```
+
+Profiles live in `config/runtime-flags/` and are intentionally composable. The
+printer merges repeated `--enable-features` and `--disable-features` switches so
+later profiles do not accidentally wipe out earlier feature lists.
+
+Useful combinations:
+
+```bash
+./scripts/print-flags.sh base compatibility
+./scripts/print-flags.sh base performance
+./scripts/print-flags.sh base privacy no-ai
+./scripts/print-flags.sh adblock-friendly
 ```
 
 ## Building on free CI (fully free, no setup)
@@ -71,6 +101,20 @@ cd "$CHROMIUM_SRC" && gn gen out/Default && autoninja -C out/Default chrome
 ```
 
 Toggle at runtime with `chrome://flags/#horizontal-tab-scrolling`.
+
+The same feature can also be toggled with:
+
+```bash
+--enable-features=HorizontalTabScrolling
+--disable-features=HorizontalTabScrolling
+```
+
+## Pain-point docs
+
+- `docs/performance-defaults.md` explains the build/runtime defaults.
+- `docs/ai-opt-out.md` tracks AI/model-download feature names and drift checks.
+- `docs/adblock-manifest.md` documents MV2/MV3 extension-manifest constraints and
+  managed-policy samples.
 
 Source of truth is `chromium.googlesource.com`; the code was read from the read-only
 `github.com/chromium/chromium` mirror.
