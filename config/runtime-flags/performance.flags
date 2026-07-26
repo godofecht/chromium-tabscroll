@@ -1,0 +1,5 @@
+# Reduce background work, warmups, and network services that make Chrome feel heavy.
+--disable-background-networking
+--disable-component-update
+--disable-domain-reliability
+--disable-features=OptimizationGuideModelDownloading,OptimizationHints,AutofillServerCommunication

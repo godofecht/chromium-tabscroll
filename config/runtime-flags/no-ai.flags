@@ -1,0 +1,2 @@
+# Keep browser AI/model-download features opt-out by default where Chromium exposes switches.
+--disable-features=OptimizationGuideModelDownloading,OptimizationGuideOnDeviceModel,Compose,TabOrganization,HistorySearch,LensOverlay

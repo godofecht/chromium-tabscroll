@@ -1,0 +1,8 @@
+# Harder privacy posture. This profile trades some Google service behavior for quiet defaults.
+--disable-background-networking
+--disable-client-side-phishing-detection
+--disable-default-apps
+--disable-sync
+--metrics-recording-only
+--safebrowsing-disable-auto-update
+--disable-features=PrivacySandboxSettings4,TopicsAPI,InterestFeedContentSuggestions

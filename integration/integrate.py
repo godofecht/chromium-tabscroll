@@ -59,8 +59,11 @@ def edit(rel, anchor, payload, *, mode="after", required=True, once=True):
 FEATURES_H = "chrome/browser/ui/tabs/features.h"
 FEATURES_CC = "chrome/browser/ui/tabs/features.cc"
 BUILD_GN = "chrome/browser/ui/BUILD.gn"
+ABOUT_FLAGS_CC = "chrome/browser/about_flags.cc"
+FLAG_DESCRIPTIONS_H = "chrome/browser/flag_descriptions.h"
 RV_H = "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"
 RV_CC = "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc"
+TAB_STRIP_CC = "chrome/browser/ui/views/tabs/tab_strip.cc"
 
 
 def main():
@@ -78,6 +81,26 @@ def main():
          "\n\n// This fork ships tab scrolling on; upstream removed it in M144.\n"
          "BASE_FEATURE(kHorizontalTabScrolling, base::FEATURE_ENABLED_BY_DEFAULT);",
          mode="after")
+
+    # 1b. chrome://flags entry: the feature is enabled by default in this fork,
+    #     but a visible flag gives users a first-class escape hatch.
+    edit(FLAG_DESCRIPTIONS_H,
+         "inline constexpr char kTabStripUnificationName[] = \"Tab Strip Unification\";",
+         "inline constexpr char kHorizontalTabScrollingName[] =\n"
+         "    \"Horizontal tab scrolling\";\n"
+         "inline constexpr char kHorizontalTabScrollingDescription[] =\n"
+         "    \"Lets the horizontal tab strip scroll sideways when tabs overflow, \"\n"
+         "    \"instead of shrinking every tab down to a minimum width.\";\n\n",
+         mode="before")
+    edit(ABOUT_FLAGS_CC,
+         "    {\"tab-strip-unification\", flag_descriptions::kTabStripUnificationName,\n"
+         "     flag_descriptions::kTabStripUnificationDescription, kOsDesktop,\n"
+         "     FEATURE_VALUE_TYPE(tabs::kTabStripUnification)},",
+         "    {\"horizontal-tab-scrolling\",\n"
+         "     flag_descriptions::kHorizontalTabScrollingName,\n"
+         "     flag_descriptions::kHorizontalTabScrollingDescription, kOsDesktop,\n"
+         "     FEATURE_VALUE_TYPE(tabs::kHorizontalTabScrolling)},\n\n",
+         mode="before")
 
     # 2. BUILD.gn: register the new files, alphabetically before tab_container.cc.
     edit(BUILD_GN,
@@ -131,6 +154,45 @@ def main():
          "    if (child != tab_strip_ && child != scroll_container_ &&\n"
          "        child != reserved_grab_handle_space_ &&",
          mode="replace", required=False)
+
+    # 7. Caption hit-test: the tab strip is nested and wider than the visible
+    #    viewport when scrolling is on. Hit-test the viewport first, then ask the
+    #    tab strip about the converted rect.
+    edit(RV_CC,
+         "  if (IsHitInView(tab_strip_, point)) {\n"
+         "    gfx::RectF rect_in_target_coords_f(gfx::Rect(point, gfx::Size(1, 1)));\n"
+         "    View::ConvertRectToTarget(this, tab_strip_, &rect_in_target_coords_f);\n"
+         "    return tab_strip_->IsRectInWindowCaption(\n"
+         "        gfx::ToEnclosingRect(rect_in_target_coords_f));\n"
+         "  }",
+         "  views::View* tab_hit_view = scroll_container_\n"
+         "                                  ? static_cast<views::View*>(scroll_container_)\n"
+         "                                  : static_cast<views::View*>(tab_strip_);\n"
+         "  if (IsHitInView(tab_hit_view, point)) {\n"
+         "    gfx::RectF rect_in_target_coords_f(gfx::Rect(point, gfx::Size(1, 1)));\n"
+         "    View::ConvertRectToTarget(this, tab_strip_, &rect_in_target_coords_f);\n"
+         "    return tab_strip_->IsRectInWindowCaption(\n"
+         "        gfx::ToEnclosingRect(rect_in_target_coords_f));\n"
+         "  }",
+         mode="replace", required=False)
+
+    # 8. Selection changes from keyboard shortcuts, session restore, or scripts
+    #    must reveal the active tab even when no wheel event has occurred.
+    edit(TAB_STRIP_CC,
+         "  // Notify all tabs whose selected state changed.\n"
+         "  for (auto tab_index :\n"
+         "       base::STLSetUnion<ui::ListSelectionModel::SelectedIndices>(\n"
+         "           no_longer_selected, newly_selected)) {\n"
+         "    tab_at(tab_index)->SelectedStateChanged();\n"
+         "  }",
+         "  // Notify all tabs whose selected state changed.\n"
+         "  for (auto tab_index :\n"
+         "       base::STLSetUnion<ui::ListSelectionModel::SelectedIndices>(\n"
+         "           no_longer_selected, newly_selected)) {\n"
+         "    tab_at(tab_index)->SelectedStateChanged();\n"
+         "  }\n\n"
+         "  new_active_tab->ScrollRectToVisible(new_active_tab->GetLocalBounds());",
+         mode="replace")
 
     print(">> base edits done")
 
