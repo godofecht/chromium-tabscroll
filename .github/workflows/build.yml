@@ -26,7 +26,7 @@ on:
     paths: [ "src/**", "integration/**", "config/**", "scripts/**", ".github/workflows/**" ]
 
 permissions:
-  contents: read
+  contents: write              # publish the finished binary as a GitHub Release
   actions: write               # to read/write the Actions cache
 
 env:
@@ -47,6 +47,11 @@ jobs:
   build:
     needs: integrate-check
     runs-on: ubuntu-latest
+    # One build at a time. A new run queues behind an in-progress one instead of
+    # competing for the runner or clobbering the warming cache.
+    concurrency:
+      group: chromium-build
+      cancel-in-progress: false
     timeout-minutes: 350         # under the 360-minute hard limit
     env:
       DEPOT_TOOLS: ${{ github.workspace }}/depot_tools
@@ -166,7 +171,27 @@ jobs:
           tar -czf "$GITHUB_WORKSPACE/chrome-tabscroll-linux.tar.gz" chrome *.pak *.bin *.dat *.so
           echo built > "$GITHUB_WORKSPACE/.build-complete"
 
-      - name: Upload Chrome binary
+      - name: Publish GitHub Release
+        if: env.build_status == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          TAG="build-$(date -u +%Y%m%d-%H%M)"
+          size=$(du -h chrome-tabscroll-linux.tar.gz | cut -f1)
+          gh release create "$TAG" chrome-tabscroll-linux.tar.gz \
+            --title "Chromium + horizontal tab scrolling ($TAG)" \
+            --notes "Linux x64 build of Chromium with horizontal tab scrolling restored (\`tabs::kHorizontalTabScrolling\`, on by default). Built on free GitHub Actions.
+
+          Download \`chrome-tabscroll-linux.tar.gz\` ($size), extract, and run \`./chrome\`.
+          Toggle with \`--enable-features=HorizontalTabScrolling\` / \`--disable-features=HorizontalTabScrolling\`."
+          # Also point a rolling 'latest' tag at this build.
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest chrome-tabscroll-linux.tar.gz \
+            --title "Chromium + horizontal tab scrolling (latest)" \
+            --notes "Rolling pointer to the most recent successful build ($TAG)."
+
+      - name: Upload Chrome binary (artifact backup)
         if: env.build_status == '0'
         uses: actions/upload-artifact@v4
         with:
