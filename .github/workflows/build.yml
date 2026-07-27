@@ -30,7 +30,7 @@ permissions:
   actions: write               # to read/write the Actions cache
 
 env:
-  CACHE_VER: v2                 # bump to discard all persisted caches
+  CACHE_VER: v3                 # bump to discard all persisted caches
 
 jobs:
   # Fast, free signal (~1 min, no checkout): do the integrator's anchors still
@@ -72,7 +72,7 @@ jobs:
     timeout-minutes: 350         # under the 360-minute hard limit
     env:
       DEPOT_TOOLS: ${{ github.workspace }}/depot_tools
-      SCCACHE_VERSION: v0.8.2
+      SCCACHE_VERSION: v0.16.0
       SCCACHE_DIR: /mnt/work/sccache
       SCCACHE_CACHE_SIZE: 9G     # stay under the 10 GB Actions-cache cap
     steps:

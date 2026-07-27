@@ -12,6 +12,8 @@ use_remoteexec = false
 # Siso's local cache lives in the ephemeral checkout and was not being persisted
 # by CI. Use Ninja so cc_wrapper below feeds the persisted sccache directory.
 use_siso = false
+# sccache cannot cache Chromium's current clang-module compile lines.
+use_clang_modules = false
 # Don't let a stray warning in fork code abort a multi-run build.
 treat_warnings_as_errors = false
 # sccache turns repeated compiles into cache hits so runs resume cheaply.
