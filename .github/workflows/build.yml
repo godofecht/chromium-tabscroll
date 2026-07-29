@@ -19,7 +19,7 @@ on:
     inputs:
       max_build_minutes:
         description: "stop the build after N minutes to leave time to save cache"
-        default: "300"
+        default: "240"
   schedule:
     - cron: "0 */6 * * *"      # every 6h: auto-continue until the build finishes
   push:
@@ -69,7 +69,7 @@ jobs:
     concurrency:
       group: chromium-build
       cancel-in-progress: false
-    timeout-minutes: 350         # under the 360-minute hard limit
+    timeout-minutes: 355         # under the 360-minute hard limit
     env:
       DEPOT_TOOLS: ${{ github.workspace }}/depot_tools
       SCCACHE_VERSION: v0.16.0
@@ -157,9 +157,9 @@ jobs:
         working-directory: ${{ env.src }}
         run: |
           sccache --start-server || true
-          MINS="${{ github.event.inputs.max_build_minutes || 300 }}"
+          MINS="${{ github.event.inputs.max_build_minutes || 240 }}"
           set +e
-          timeout "${MINS}m" autoninja -C out/Default chrome
+          timeout --kill-after=60s "${MINS}m" autoninja -C out/Default chrome
           status=$?
           set -e
           sccache --show-stats || true
@@ -170,6 +170,17 @@ jobs:
             echo "::error::Chromium build failed with exit status $status."
             exit $status
           fi
+
+      - name: Quiesce compiler cache
+        if: always() && env.skip != '1'
+        run: |
+          # The time-boxed build can leave clang/sccache workers finishing writes
+          # after ninja exits. Stop them before actions/cache tars SCCACHE_DIR.
+          pkill -TERM -f '(^|/)(autoninja|ninja|clang|clang\+\+)( |$)' || true
+          sleep 10
+          pkill -KILL -f '(^|/)(autoninja|ninja|clang|clang\+\+)( |$)' || true
+          sccache --stop-server || true
+          sleep 3
 
       # Always persist the warmed cache, even when the build timed out, so the
       # next run resumes. Unique key per run; restore-keys grabs the newest.

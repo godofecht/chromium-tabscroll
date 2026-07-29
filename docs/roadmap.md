@@ -21,6 +21,10 @@ repo from a tab-scrolling patch into a practical Chromium overlay toolkit for
   `TabStrip::SetSelection`.
 - Fixed caption hit-testing so the scrolled viewport is checked before delegating
   to the nested tab strip.
+- Removed the top-right Glic/Gemini tab-strip action container from the forked
+  horizontal tab-strip path.
+- Skipped the trailing grab-handle reservation while horizontal tab scrolling is
+  enabled, so tabs can extend through the freed space.
 - Added CI assertions for the new tab-scroll source/header entries, include,
   z-order handling, new-tab-button placement, flag entry, and active-tab reveal.
 - Fixed the GitHub Actions build step so real compile failures fail the workflow

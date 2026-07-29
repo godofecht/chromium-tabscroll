@@ -76,6 +76,9 @@ A `views::ScrollView` subclass that:
    the nested tab strip.
 7. `TabStrip::SetSelection` scrolls the active tab into view so keyboard
    shortcuts, session restore, and programmatic selection do not leave it hidden.
+8. The Glic/Gemini tab-strip action container is not instantiated in this fork,
+   and the trailing grab-handle reservation is skipped while
+   `kHorizontalTabScrolling` is enabled, so tabs can use the top-right tab row.
 
 ## Known follow-ups (the CI compile loop will surface these)
 
