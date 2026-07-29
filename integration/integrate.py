@@ -194,6 +194,33 @@ def main():
          "  new_active_tab->ScrollRectToVisible(new_active_tab->GetLocalBounds());",
          mode="replace")
 
+    # 9. Do not create the Glic/Gemini tab-strip action container in this fork.
+    #    It occupies the trailing/top-right tab-strip space users expect tabs to
+    #    use. Leaving the local unique_ptr null makes the later AddChildView
+    #    block a no-op without touching unrelated toolbar code.
+    edit(RV_CC,
+         "  // Add and configure the TabStripComboButton.\n"
+         "  std::unique_ptr<TabStripActionContainer> tab_strip_action_container;\n"
+         "  if (browser &&\n"
+         "      (browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL)) {\n"
+         "    // The Glic button visibility is dynamic and depends on profile state\n"
+         "    // (e.g., sign-in status, enterprise policies, recoverable errors).\n"
+         "    // We instantiate the action container if the profile is eligible (even if\n"
+         "    // the button is not currently shown, e.g. when signed out) so that it can\n"
+         "    // dynamically update its visibility when the profile state changes.\n"
+         "    if (glic::GlicEnabling::IsProfileEligible(profile())) {\n"
+         "      tab_strip_action_container =\n"
+         "          std::make_unique<TabStripActionContainer>(browser);\n"
+         "      tab_strip_action_container->SetProperty(views::kCrossAxisAlignmentKey,\n"
+         "                                              views::LayoutAlignment::kStart);\n"
+         "    }\n"
+         "  }",
+         "  // This fork gives the horizontal tab strip the trailing space instead of\n"
+         "  // instantiating the Glic/Gemini action container there.\n"
+         "  std::unique_ptr<TabStripActionContainer> tab_strip_action_container;",
+         mode="replace",
+         required=False)
+
     print(">> base edits done")
 
 
@@ -227,6 +254,35 @@ def replace_construction():
         "  }"
     )
     text = text.replace(anchor, payload, 1)
+
+    # With tab scrolling enabled, do not reserve a trailing grab-handle block
+    # between the tab strip and the window controls. That empty region is what
+    # makes tabs stop before the right edge even after removing the action
+    # container. Keep upstream behavior when the feature is disabled.
+    grab_anchor = (
+        "  reserved_grab_handle_space_ =\n"
+        "      AddChildView(std::make_unique<FrameGrabHandle>());\n"
+        "  reserved_grab_handle_space_->SetProperty(\n"
+        "      views::kFlexBehaviorKey,\n"
+        "      views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,\n"
+        "                               views::MaximumFlexSizeRule::kUnbounded)\n"
+        "          .WithOrder(3));"
+    )
+    if grab_anchor in text:
+        grab_payload = (
+            "  if (!base::FeatureList::IsEnabled(tabs::kHorizontalTabScrolling)) {\n"
+            "    reserved_grab_handle_space_ =\n"
+            "        AddChildView(std::make_unique<FrameGrabHandle>());\n"
+            "    reserved_grab_handle_space_->SetProperty(\n"
+            "        views::kFlexBehaviorKey,\n"
+            "        views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,\n"
+            "                                 views::MaximumFlexSizeRule::kUnbounded)\n"
+            "            .WithOrder(3));\n"
+            "  }")
+        text = text.replace(grab_anchor, grab_payload, 1)
+    else:
+        print(f"  WARN  grab-handle reservation anchor not found in {RV_CC}; "
+              "verify trailing tab-strip space")
 
     # Apply the flex spec to whichever view is the FlexLayout child.
     flex_anchor = ("tab_strip_->SetProperty(views::kFlexBehaviorKey, "

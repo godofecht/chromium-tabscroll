@@ -55,6 +55,8 @@ assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "SetA
 assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "children.emplace_back(scroll_container_.get())"
 assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "tab_hit_view = scroll_container_"
 assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "scroll_container_->bounds().right()"
+assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "Glic/Gemini action container"
+assert "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc" "!base::FeatureList::IsEnabled(tabs::kHorizontalTabScrolling)"
 assert "chrome/browser/ui/views/tabs/tab_strip.cc" "new_active_tab->ScrollRectToVisible"
 
 # Idempotency: a second run must not error or double-apply.
