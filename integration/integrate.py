@@ -102,9 +102,10 @@ def main():
          "     FEATURE_VALUE_TYPE(tabs::kHorizontalTabScrolling)},\n\n",
          mode="before")
 
-    # 2. BUILD.gn: register the new files, alphabetically before tab_container.cc.
+    # 2. BUILD.gn: keep the scroll container in the same monolithic UI target
+    #    as horizontal_tab_strip_region_view.cc, which constructs and uses it.
     edit(BUILD_GN,
-         '      "views/tabs/tab_container.cc",',
+         '      "views/frame/horizontal_tab_strip_region_view.cc",',
          '      "views/tabs/horizontal_tab_scroll_container.cc",\n'
          '      "views/tabs/horizontal_tab_scroll_container.h",\n',
          mode="before")
