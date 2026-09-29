@@ -118,7 +118,17 @@ jobs:
       - name: Fetch depot_tools
         if: env.skip != '1'
         run: |
-          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_TOOLS"
+          for attempt in 1 2 3; do
+            rm -rf "$DEPOT_TOOLS"
+            if git clone --filter=blob:none https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_TOOLS"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Failed to clone depot_tools after 3 attempts."
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           echo "$DEPOT_TOOLS" >> "$GITHUB_PATH"
           "$DEPOT_TOOLS/update_depot_tools"
 
