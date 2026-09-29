@@ -120,6 +120,7 @@ jobs:
         run: |
           git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_TOOLS"
           echo "$DEPOT_TOOLS" >> "$GITHUB_PATH"
+          "$DEPOT_TOOLS/update_depot_tools"
 
       - name: Fetch Chromium (no history)
         if: env.skip != '1'
