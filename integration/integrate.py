@@ -58,7 +58,7 @@ def edit(rel, anchor, payload, *, mode="after", required=True, once=True):
 
 FEATURES_H = "chrome/browser/ui/tabs/features.h"
 FEATURES_CC = "chrome/browser/ui/tabs/features.cc"
-BUILD_GN = "chrome/browser/ui/BUILD.gn"
+BUILD_GN = "chrome/browser/ui/views/frame/BUILD.gn"
 ABOUT_FLAGS_CC = "chrome/browser/about_flags.cc"
 FLAG_DESCRIPTIONS_H = "chrome/browser/flag_descriptions.h"
 RV_H = "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"
@@ -105,10 +105,13 @@ def main():
     # 2. BUILD.gn: keep the scroll container in the same monolithic UI target
     #    as horizontal_tab_strip_region_view.cc, which constructs and uses it.
     edit(BUILD_GN,
-         '      "views/frame/horizontal_tab_strip_region_view.cc",',
-         '      "views/tabs/horizontal_tab_scroll_container.cc",\n'
-         '      "views/tabs/horizontal_tab_scroll_container.h",\n',
-         mode="before")
+         '  sources = [ "horizontal_tab_strip_region_view.cc" ]',
+         '  sources = [\n'
+         '    "horizontal_tab_strip_region_view.cc",\n'
+         '    "../tabs/horizontal_tab_scroll_container.cc",\n'
+         '    "../tabs/horizontal_tab_scroll_container.h",\n'
+         '  ]',
+         mode="replace")
 
     # 3. Region view header: forward-declare + member.
     edit(RV_H,
