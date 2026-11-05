@@ -174,7 +174,17 @@ jobs:
           status=$?
           set -e
           sccache --show-stats || true
-          echo "build_status=$status" >> "$GITHUB_ENV"
+          # Only publish a nonnumeric success sentinel after the binary exists.
+          # GitHub Actions loose equality can treat an unset value as numeric 0.
+          if [ "$status" -eq 0 ]; then
+            if [ ! -x out/Default/chrome ]; then
+              echo "::error::Build exited 0 but out/Default/chrome is missing or not executable."
+              exit 1
+            fi
+            echo "build_status=complete" >> "$GITHUB_ENV"
+          else
+            echo "build_status=incomplete" >> "$GITHUB_ENV"
+          fi
           if [ $status -eq 124 ]; then
             echo "::notice::Time box hit. Cache saved; the schedule will continue."
           elif [ $status -ne 0 ]; then
@@ -203,7 +213,7 @@ jobs:
           key: sccache-${{ env.CACHE_VER }}-${{ github.run_id }}
 
       - name: Package Chrome (if the build finished)
-        if: env.build_status == '0'
+        if: env.skip != '1' && env.build_status == 'complete'
         working-directory: ${{ env.src }}
         run: |
           cd out/Default
@@ -214,7 +224,7 @@ jobs:
           echo built > "$GITHUB_WORKSPACE/.build-complete"
 
       - name: Publish GitHub Release
-        if: env.build_status == '0'
+        if: env.skip != '1' && env.build_status == 'complete'
         env:
           GH_TOKEN: ${{ github.token }}
         working-directory: ${{ github.workspace }}
@@ -234,7 +244,7 @@ jobs:
             --notes "Rolling pointer to the most recent successful build ($TAG)."
 
       - name: Upload Chrome binary (artifact backup)
-        if: env.build_status == '0'
+        if: env.skip != '1' && env.build_status == 'complete'
         uses: actions/upload-artifact@v4
         with:
           name: chrome-tabscroll-linux
@@ -242,7 +252,7 @@ jobs:
           retention-days: 14
 
       - name: Mark build complete
-        if: env.build_status == '0'
+        if: env.skip != '1' && env.build_status == 'complete'
         uses: actions/cache/save@v4
         with:
           path: .build-complete
